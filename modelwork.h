@@ -1,4 +1,4 @@
-#pragma once
+п»ї#pragma once
 
 // ==== STL ====
 
@@ -11,7 +11,7 @@
 #include <cstdlib>
 
 // ==== OpenGL ====
-#include <GL/gl.h> // или твой glew/glad include (оставь как у тебя в проекте)
+#include <GL/gl.h> // РёР»Рё С‚РІРѕР№ glew/glad include (РѕСЃС‚Р°РІСЊ РєР°Рє Сѓ С‚РµР±СЏ РІ РїСЂРѕРµРєС‚Рµ)
 
 // ==== GLM ====
 #include <glm/glm.hpp>
@@ -24,9 +24,9 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 
-// ==== stb_image / твои хелперы ====
+// ==== stb_image / С‚РІРѕРё С…РµР»РїРµСЂС‹ ====
 /*
-  Тут предполагается, что в проекте уже есть:
+  РўСѓС‚ РїСЂРµРґРїРѕР»Р°РіР°РµС‚СЃСЏ, С‡С‚Рѕ РІ РїСЂРѕРµРєС‚Рµ СѓР¶Рµ РµСЃС‚СЊ:
   - LoadTexture2D(...)
   - stbi_load / stbi_load_from_memory / stbi_image_free
   - OutputDebugStringA
@@ -38,18 +38,25 @@
 
 inline glm::mat4 AiToGlm(const aiMatrix4x4& m)
 {
-    return glm::mat4(
+  /*  return glm::mat4(
         m.a1, m.a2, m.a3, m.a4,
         m.b1, m.b2, m.b3, m.b4,
         m.c1, m.c2, m.c3, m.c4,
         m.d1, m.d2, m.d3, m.d4
-    );
+    );*/
+    glm::mat4 r;
+    // GLM: r[col][row]
+    r[0][0] = m.a1; r[0][1] = m.b1; r[0][2] = m.c1; r[0][3] = m.d1;
+    r[1][0] = m.a2; r[1][1] = m.b2; r[1][2] = m.c2; r[1][3] = m.d2;
+    r[2][0] = m.a3; r[2][1] = m.b3; r[2][2] = m.c3; r[2][3] = m.d3;
+    r[3][0] = m.a4; r[3][1] = m.b4; r[3][2] = m.c4; r[3][3] = m.d4;
+    return r;
 }
 
 struct TextureInfo {
     GLuint id = 0;
     std::string type;   // "texture_diffuse", ...
-    std::string path;   // для предотвращения повторной загрузки
+    std::string path;   // РґР»СЏ РїСЂРµРґРѕС‚РІСЂР°С‰РµРЅРёСЏ РїРѕРІС‚РѕСЂРЅРѕР№ Р·Р°РіСЂСѓР·РєРё
 };
 
 static TextureInfo LoadTextureFromFile(const std::string& filename,
@@ -89,7 +96,7 @@ static TextureInfo LoadTexture_Assimp(
 
     std::string texPath = str.C_Str();
 
-    // кэш по (path,typeName)
+    // РєСЌС€ РїРѕ (path,typeName)
     for (const auto& t : loaded) {
         if (t.path == texPath && t.type == typeName)
             return t;
@@ -204,8 +211,9 @@ struct Mesh {
     GLuint vao = 0, vbo = 0, ebo = 0;
     GLsizei indexCount = 0;
     std::vector<TextureInfo> textures;
+    std::string name;
 
-    // Для анимации по нодам:
+    // Р”Р»СЏ Р°РЅРёРјР°С†РёРё РїРѕ РЅРѕРґР°Рј:
     int nodeIndex = -1;
 
     void Draw(GLuint shader) const
@@ -213,6 +221,11 @@ struct Mesh {
         if (!textures.empty()) {
             glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, textures[0].id);
+            if (name == "Mesh0")
+            {
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            }
             GLint loc = glGetUniformLocation(shader, "uTex");
             if (loc >= 0) glUniform1i(loc, 0);
         }
@@ -284,7 +297,7 @@ struct Model {
     std::string directory;
     std::vector<TextureInfo> loadedTextures;
 
-    // Ноды (для анимации)
+    // РќРѕРґС‹ (РґР»СЏ Р°РЅРёРјР°С†РёРё)
     std::vector<std::string> nodeNames;
     std::vector<int> nodeParent;
     std::vector<glm::mat4> nodeBaseLocal;  // base local from aiNode->mTransformation
@@ -297,18 +310,18 @@ struct Model {
 
     bool Load(const std::string& path);
 
-    // обычный статический draw (как раньше)
+    // РѕР±С‹С‡РЅС‹Р№ СЃС‚Р°С‚РёС‡РµСЃРєРёР№ draw (РєР°Рє СЂР°РЅСЊС€Рµ)
     void Draw(GLuint shader) const;
     void DrawInstanced(GLuint shader, GLsizei instanceCount) const;
 
-    // анимация нод
+    // Р°РЅРёРјР°С†РёСЏ РЅРѕРґ
     void ResetAnimation() { animTimeTicks = 0.0; }
     void UpdateAnimation(float dt);
     void DrawWithAnimation(GLuint shader, const glm::mat4& world) const;
 };
 
 // =======================================================
-// TREE SYSTEM (как у тебя было)
+// TREE SYSTEM (РєР°Рє Сѓ С‚РµР±СЏ Р±С‹Р»Рѕ)
 // =======================================================
 
 struct TreeInstance {
@@ -323,7 +336,7 @@ extern GLsizei g_treeInstanceCount;
 extern std::vector<TreeInstance> g_treeInstances;
 extern GLuint g_treeShader;
 
-// g_treeRemoved живёт в main.cpp — объявляем как extern
+// g_treeRemoved Р¶РёРІС‘С‚ РІ main.cpp вЂ” РѕР±СЉСЏРІР»СЏРµРј РєР°Рє extern
 extern std::vector<bool> g_treeRemoved;
 
 bool LoadOBJ(const char* path, Mesh& outMesh);
@@ -378,7 +391,7 @@ inline bool Model::Load(const std::string& path)
     meshes.clear();
     loadedTextures.clear();
 
-    // ноды/анимация
+    // РЅРѕРґС‹/Р°РЅРёРјР°С†РёСЏ
     nodeNames.clear();
     nodeParent.clear();
     nodeBaseLocal.clear();
@@ -390,8 +403,6 @@ inline bool Model::Load(const std::string& path)
 
     std::unordered_map<std::string, int> nodeIndexByName;
 
-    // processNode(node, parentIndex, parentGlobal) — parentGlobal не нужен,
-    // потому что мы больше НЕ запекаем трансформ в вершины.
     std::function<void(aiNode*, int)> processNode;
     processNode = [&](aiNode* node, int parentIndex)
         {
@@ -409,6 +420,28 @@ inline bool Model::Load(const std::string& path)
             {
                 aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
 
+                const std::string meshName = mesh->mName.C_Str();
+                const bool isSaw = (meshName == "Mesh0");
+
+                float minU = 0.0f, minV = 0.0f;
+                float maxU = 0.0f, maxV = 0.0f;
+                bool hasUV = mesh->HasTextureCoords(0);
+
+                if (isSaw && hasUV)
+                {
+                    minU = minV = 1e9f;
+                    maxU = maxV = -1e9f;
+
+                    for (unsigned int v = 0; v < mesh->mNumVertices; ++v)
+                    {
+                        const aiVector3D uv = mesh->mTextureCoords[0][v];
+                        minU = std::min(minU, (float)uv.x);
+                        minV = std::min(minV, (float)uv.y);
+                        maxU = std::max(maxU, (float)uv.x);
+                        maxV = std::max(maxV, (float)uv.y);
+                    }
+                }
+
                 std::vector<float> vertices;
                 std::vector<unsigned int> indices;
                 std::vector<TextureInfo> textures;
@@ -421,17 +454,32 @@ inline bool Model::Load(const std::string& path)
                     aiVector3D nor = mesh->HasNormals() ? mesh->mNormals[v] : aiVector3D(0, 1, 0);
                     aiVector3D uv = mesh->HasTextureCoords(0) ? mesh->mTextureCoords[0][v] : aiVector3D(0, 0, 0);
 
-                    // НЕ ЗАПЕКАЕМ node transform!
+                    float u = (float)uv.x;
+                    float vv = (float)uv.y;
+
+                    // вњ… ONLY for saw: normalize UV into 0..1
+                    if (isSaw && mesh->HasTextureCoords(0))
+                    {
+                        float offU = -std::floor(minU);
+                        float offV = -std::floor(minV);
+
+                        u += offU;
+                        vv += offV;
+                    }
+
+                    // POSITION (3)
                     vertices.push_back(pos.x);
                     vertices.push_back(pos.y);
                     vertices.push_back(pos.z);
 
+                    // NORMAL (3)
                     vertices.push_back(nor.x);
                     vertices.push_back(nor.y);
                     vertices.push_back(nor.z);
 
-                    vertices.push_back(uv.x);
-                    vertices.push_back(uv.y);
+                    // UV (2)
+                    vertices.push_back(u);
+                    vertices.push_back(vv);
                 }
 
                 for (unsigned int f = 0; f < mesh->mNumFaces; ++f) {
@@ -444,21 +492,42 @@ inline bool Model::Load(const std::string& path)
                 {
                     aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
 
-                    auto texDiffuse = LoadTexture_Assimp(scene, material,
-                        aiTextureType_DIFFUSE,
+                    // вњ… For glTF/GLB prefer BASE_COLOR
+                    TextureInfo texBase = LoadTexture_Assimp(scene, material,
+                        (aiTextureType)aiTextureType_BASE_COLOR,
                         0, directory,
                         "texture_diffuse", textures);
 
-                    if (texDiffuse.id == 0)
+                    if (texBase.id == 0)
                     {
-                        texDiffuse = LoadTexture_Assimp(scene, material,
-                            (aiTextureType)aiTextureType_BASE_COLOR,
+                        // fallback
+                        LoadTexture_Assimp(scene, material,
+                            aiTextureType_DIFFUSE,
                             0, directory,
                             "texture_diffuse", textures);
                     }
                 }
 
+                // optional material debug
+                /*
+                if (isSaw)
+                {
+                    OutputDebugStringA("==== Mesh0 material debug ====\n");
+                    char b[128];
+                    sprintf_s(b, "materialIndex=%d texturesCount=%d\n",
+                        mesh->mMaterialIndex, (int)textures.size());
+                    OutputDebugStringA(b);
+
+                    for (auto& t : textures)
+                    {
+                        std::string s = "type=" + t.type + " path=" + t.path + " id=" + std::to_string(t.id) + "\n";
+                        OutputDebugStringA(s.c_str());
+                    }
+                }
+                */
+
                 Mesh out;
+                out.name = meshName;
                 out.textures = textures;
                 out.indexCount = (GLsizei)indices.size();
                 out.nodeIndex = myIndex;
@@ -569,8 +638,8 @@ inline void Model::Draw(GLuint shader) const
 
 inline void Model::DrawInstanced(GLuint shader, GLsizei instanceCount) const
 {
-    // ВАЖНО:
-    // НЕ надо тут проверять g_treeRemoved — это логика инстансов, а не мешей.
+    // Р’РђР–РќРћ:
+    // РќР• РЅР°РґРѕ С‚СѓС‚ РїСЂРѕРІРµСЂСЏС‚СЊ g_treeRemoved вЂ” СЌС‚Рѕ Р»РѕРіРёРєР° РёРЅСЃС‚Р°РЅСЃРѕРІ, Р° РЅРµ РјРµС€РµР№.
     for (const auto& m : meshes)
         m.DrawInstanced(shader, instanceCount);
 }
@@ -587,11 +656,11 @@ inline void Model::UpdateAnimation(float dt)
     if (clip.durationTicks > 0.0)
         animTimeTicks = std::fmod(animTimeTicks, clip.durationTicks);
 
-    // по умолчанию — base pose
+    // РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ вЂ” base pose
     for (size_t i = 0; i < nodeBaseLocal.size(); ++i)
         nodeAnimLocal[i] = nodeBaseLocal[i];
 
-    // применяем каналы: мы перезаписываем локалку на base*TRS
+    // РїСЂРёРјРµРЅСЏРµРј РєР°РЅР°Р»С‹: РјС‹ РїРµСЂРµР·Р°РїРёСЃС‹РІР°РµРј Р»РѕРєР°Р»РєСѓ РЅР° base*TRS
     for (const auto& ch : clip.channels)
     {
         int ni = ch.nodeIndex;
@@ -626,7 +695,7 @@ inline void Model::UpdateAnimation(float dt)
                 glm::quat q0 = ch.rValues[k];
                 glm::quat q1 = ch.rValues[k2];
 
-                // чтобы не крутило через "длинный путь"
+                // С‡С‚РѕР±С‹ РЅРµ РєСЂСѓС‚РёР»Рѕ С‡РµСЂРµР· "РґР»РёРЅРЅС‹Р№ РїСѓС‚СЊ"
                 if (glm::dot(q0, q1) < 0.0f) q1 = -q1;
 
                 R = glm::normalize(glm::quat(
@@ -656,10 +725,11 @@ inline void Model::UpdateAnimation(float dt)
         TRS *= glm::mat4_cast(R);
         TRS = glm::scale(TRS, S);
 
-        nodeAnimLocal[ni] = nodeBaseLocal[ni] * TRS;
+        //nodeAnimLocal[ni] = nodeBaseLocal[ni] * TRS;
+        nodeAnimLocal[ni] = TRS;
     }
 
-    // пересчитать global
+    // РїРµСЂРµСЃС‡РёС‚Р°С‚СЊ global
     for (int i = 0; i < (int)nodeAnimLocal.size(); ++i)
     {
         int p = nodeParent[i];
@@ -677,6 +747,11 @@ inline void Model::DrawWithAnimation(GLuint shader, const glm::mat4& world) cons
 
     for (const auto& m : meshes)
     {
+        glm::mat4 G = nodeGlobal[m.nodeIndex];
+        if (!std::isfinite(G[3][0]) || !std::isfinite(G[3][1]) || !std::isfinite(G[3][2])) {
+            OutputDebugStringA("NaN/INF in nodeGlobal\n");
+        }
+
         glm::mat4 M = world;
 
         if (hasAnimation && m.nodeIndex >= 0 && m.nodeIndex < (int)nodeGlobal.size())

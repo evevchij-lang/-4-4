@@ -891,11 +891,11 @@ void TryStartCut();
 void UpdateCamera(float dt)
 {
 
-    if (GetAsyncKeyState(VK_ESCAPE) & 0x0001)
-    {
-        g_running = false;  // или как у тебя называется флаг цикла
-        return;
-    }
+    //if (GetAsyncKeyState(VK_ESCAPE) & 0x0001)
+    //{
+    //    g_running = false;  // или как у тебя называется флаг цикла
+    //    return;
+    //}
     
     ProcessMouse();
 
@@ -970,14 +970,14 @@ void UpdateCamera(float dt)
 
     //Если выбраны грабли отлов левой клавиши мыши для  удаления травы
     // Запуск анимации взмаха граблями по клику
-    /*if (g_currentTool == TOOL_RAKE &&
+    if (g_currentTool == TOOL_RAKE &&
         (GetAsyncKeyState(VK_LBUTTON) & 0x8000) &&
         !g_rakeSwinging)
     {
         g_rakeSwinging = true;
         g_rakeSwingTime = 0.0f;
         g_rakeHitDone = false;
-    }*/
+    }
 
     // Лопата: копаем ямку ЛКМ, радиус 0.5м, глубина 0.5м, дистанция до 3м
     if (g_currentTool == TOOL_SHOVEL &&
@@ -1810,8 +1810,9 @@ void ResolveTreeCollisions(glm::vec3& pos)
 {
     int i = 0;
     for (const auto& inst : g_treeInstances)
-    {
-        if (g_treeRemoved[i]) continue;
+    {        
+        if (i < g_treeRemoved.size() && g_treeRemoved[i]) continue;
+        i++;
         glm::vec2 p(pos.x, pos.z);
         glm::vec2 c(inst.pos.x, inst.pos.z);
         glm::vec2 d = p - c;
@@ -1837,7 +1838,8 @@ bool IsTreeBlockingDig(const glm::vec3& center, float holeRadius)
 
     for (const auto& t : g_treeInstances)
     {
-        if (g_treeRemoved[i]) continue;
+        if (i < g_treeRemoved.size() && g_treeRemoved[i]) continue;
+        i++;
         float dx = t.pos.x - center.x;
         float dz = t.pos.z - center.z;
         float dist2 = dx * dx + dz * dz;
