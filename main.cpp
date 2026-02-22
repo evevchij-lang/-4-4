@@ -29,7 +29,7 @@ float g_playerRadius = 0.6f;    // радиус для коллизии
 float g_playerVelY = 0.0f;    // вертикальная скорость
 bool  g_onGround = false;   // стоит ли игрок на земле
 
-
+GLuint g_cutShader = 0;
 
 const float G_GRAVITY = -25.0f;  // гравитация
 const float G_JUMP_VEL = 10.0f;   // сила прыжка
@@ -890,16 +890,13 @@ void TryStartCut();
 
 void UpdateCamera(float dt)
 {
-    
 
-    if (g_cuttingTree && g_lockPlayerDuringCut)
+    if (GetAsyncKeyState(VK_ESCAPE) & 0x0001)
     {
-        // но! не забывай обновлять таймер анимации
-        //UpdateCut(dt);
-        UpdateCutAnim(dt);
-        return; // отрезаем управление движением на время пиления
+        g_running = false;  // или как у тебя называется флаг цикла
+        return;
     }
-
+    
     ProcessMouse();
 
     if (g_cutAnim.active)
@@ -915,8 +912,8 @@ void UpdateCamera(float dt)
         if (GetAsyncKeyState(VK_PRIOR) & 0x8000) g_cutAnim.pos.y += step; // PageUp
         if (GetAsyncKeyState(VK_NEXT) & 0x8000) g_cutAnim.pos.y -= step; // PageDown
 
-        if (GetAsyncKeyState('[') & 0x8000) g_cutAnim.rot.y -= rotStep;
-        if (GetAsyncKeyState(']') & 0x8000) g_cutAnim.rot.y += rotStep;
+        if (GetAsyncKeyState(VK_NUMPAD1) & 0x8000) g_cutAnim.rot.y -= rotStep;
+        if (GetAsyncKeyState(VK_NUMPAD3) & 0x8000) g_cutAnim.rot.y += rotStep;
 
         if (GetAsyncKeyState(VK_OEM_MINUS) & 0x8000)
             g_cutAnim.scale = glm::max(0.01f, g_cutAnim.scale - 0.01f);
@@ -924,6 +921,18 @@ void UpdateCamera(float dt)
         if (GetAsyncKeyState(VK_OEM_PLUS) & 0x8000)
             g_cutAnim.scale += 0.01f;
     }
+
+    if (g_cuttingTree && g_lockPlayerDuringCut)
+    {
+        // но! не забывай обновлять таймер анимации
+        //UpdateCut(dt);
+        UpdateCutAnim(dt);
+        return; // отрезаем управление движением на время пиления
+    }
+
+    
+
+    
 
 
     auto key = [](int vk) {
@@ -1349,6 +1358,7 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int)
     // Загружаем шейдеры
     g_shader = CreateShaderProgram("terrain.vert", "terrain.frag");
     g_postShader = CreateShaderProgram("screen_post.vert", "screen_post.frag");
+    g_cutShader = CreateShaderProgram("cut_anim.vert", "cut_anim.frag");
 
     // Загружаем heightmap (если есть) и строим террейн
     g_terrain.loadHeightmap("heightmap.png");   // можно закомментить, если файла нет
@@ -2003,6 +2013,33 @@ static void SnapPlayerToTreeFront(int treeIdx)
     g_cam.updateVectors();
 }
 
+void RebuildTreeInstanceBuffer()
+{
+    std::vector<glm::mat4> mats;
+    mats.reserve(g_treeInstances.size());
+
+    for (size_t i = 0; i < g_treeInstances.size(); ++i)
+    {
+        if (i < g_treeRemoved.size() && g_treeRemoved[i]) continue;
+
+        const auto& t = g_treeInstances[i];
+
+        glm::mat4 M(1.0f);
+        M = glm::translate(M, t.pos);
+        M = glm::scale(M, glm::vec3(t.scale));
+        mats.push_back(M);
+    }
+
+    g_treeInstanceCount = (GLsizei)mats.size();
+
+    glBindBuffer(GL_ARRAY_BUFFER, g_treeInstanceVBO);
+    glBufferData(GL_ARRAY_BUFFER,
+        mats.size() * sizeof(glm::mat4),
+        mats.empty() ? nullptr : mats.data(),
+        GL_DYNAMIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+
 void TryStartCut()
 {
     if (g_cuttingTree) return;
@@ -2014,6 +2051,12 @@ void TryStartCut()
     // 1) ищем дерево рядом (радиус подстрой)
     int idx = FindNearestTreeIndexXZ(p, 5.0f);
     if (idx < 0) return;
+    if (g_treeRemoved[idx]) return;
+    g_treeRemoved[idx] = true;
+    RebuildTreeInstanceBuffer();
+
+    // 3) заспавнить анимацию на позиции дерева
+    StartCutAnimAt(g_treeInstances[idx].pos);
 
     const auto& t = g_treeInstances[idx];
 

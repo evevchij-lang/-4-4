@@ -12,6 +12,8 @@ int waterW, waterH;             // как hmW, hmH
 GLuint g_waterMaskTex = 0;
 
 
+
+
 //для подводы 
 glm::vec3 fogColorTop = glm::vec3(0.6f, 0.7f, 0.9f);
 glm::vec3 fogColorUnder = glm::vec3(0.04f, 0.18f, 0.22f);

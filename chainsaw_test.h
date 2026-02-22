@@ -649,15 +649,16 @@ void UpdateCutAnim(float dt)
 
     g_cutAnim.t += dt;
 
-    // прогоняем анимацию в Model
-    // ВАЖНО: тут зависит от modelwork.h.
-    // Если у тебя UpdateAnimation(dt) крутит внутренний time сам — просто вызывай:
+    // прогоняем анимацию модели
     g_treeCutAnimModel.UpdateAnimation(dt);
 
-    // Если нужно вручную остановить по времени:
     if (g_cutAnim.t >= g_cutAnim.duration)
     {
-        g_cutAnim.active = false; // проиграли и исчезли
+        g_cutAnim.active = false;
+        // на всякий случай
+        g_cuttingTree = false;
+        g_cutTime = 0.0f;
+        g_targetTreeIndex = -1;
     }
 }
 
@@ -665,22 +666,50 @@ void DrawCutAnim(const glm::mat4& proj, const glm::mat4& view)
 {
     if (!g_cutAnim.active) return;
 
+    GLint prevProgram = 0;
+    glGetIntegerv(GL_CURRENT_PROGRAM, &prevProgram);
+
+    GLint prevVAO = 0;
+    glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &prevVAO);
+
+    GLint prevActiveTex = 0;
+    glGetIntegerv(GL_ACTIVE_TEXTURE, &prevActiveTex);
+
+    // (опционально) cull может переворачивать “ветки/изнанку”
+    GLboolean cullWas = glIsEnabled(GL_CULL_FACE);
+    glDisable(GL_CULL_FACE);
+
+    glUseProgram(g_cutShader);
+    glUniformMatrix4fv(glGetUniformLocation(g_cutShader, "uProjection"), 1, GL_FALSE, &proj[0][0]);
+    glUniformMatrix4fv(glGetUniformLocation(g_cutShader, "uView"), 1, GL_FALSE, &view[0][0]);
+
     glm::mat4 M(1.0f);
     M = glm::translate(M, g_cutAnim.pos);
     M = glm::rotate(M, g_cutAnim.rot.y, glm::vec3(0, 1, 0));
     M = glm::rotate(M, g_cutAnim.rot.x, glm::vec3(1, 0, 0));
     M = glm::rotate(M, g_cutAnim.rot.z, glm::vec3(0, 0, 1));
-    M = glm::scale(M, glm::vec3(g_cutAnim.scale));
+    M = glm::scale(M, glm::vec3(0.3));
 
-    // у тебя уже есть общий Draw для Model
-    // обычно это что-то типа: g_treeCutAnimModel.Draw(shader, M, proj, view)
-    // Но в твоём проекте Draw(shader) берёт uModel из uniform.
-    // Поэтому: выставь uProjection/uView/uModel и вызови Draw как в остальных моделях.
+    g_treeCutAnimModel.DrawWithAnimation(g_cutShader, M);
 
-    glUseProgram(g_treeShader); // или какой у тебя шейдер для моделей
-    glUniformMatrix4fv(glGetUniformLocation(g_treeShader, "uProjection"), 1, GL_FALSE, &proj[0][0]);
-    glUniformMatrix4fv(glGetUniformLocation(g_treeShader, "uView"), 1, GL_FALSE, &view[0][0]);
-    glUniformMatrix4fv(glGetUniformLocation(g_treeShader, "uModel"), 1, GL_FALSE, &M[0][0]);
+    // restore
+    if (cullWas) glEnable(GL_CULL_FACE);
+    glActiveTexture(prevActiveTex);
+    glBindVertexArray(prevVAO);
+    glUseProgram(prevProgram);
+    
+    ///*OFFSET = 0.8842, 1.2589, -3.1173
+    //    ROT = -10.0000, 12.0000, 0.0000
+    //    SCALE = 0.5500*/
 
-    g_treeCutAnimModel.Draw(g_treeShader);
+    //glm::mat4 M(1.0f);
+    //M = glm::translate(M, g_cutAnim.pos);
+    //M = glm::rotate(M, g_cutAnim.rot.y, glm::vec3(0, 1, 0));
+    //M = glm::rotate(M, g_cutAnim.rot.x, glm::vec3(1, 0, 0));
+    //M = glm::rotate(M, g_cutAnim.rot.z, glm::vec3(0, 0, 1));
+    //M = glm::scale(M, glm::vec3(0.3));
+    //glUniformMatrix4fv(glGetUniformLocation(g_treeShader, "uModel"), 1, GL_FALSE, &M[0][0]);
+
+    //// ВАЖНО: именно DrawWithAnimation (он сам будет выставлять uModel на каждый меш)
+    //g_treeCutAnimModel.DrawWithAnimation(g_cutShader, M);
 }
