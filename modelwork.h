@@ -23,6 +23,7 @@
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
+#include <assimp/material.h>
 
 // ==== stb_image / твои хелперы ====
 /*
@@ -96,6 +97,23 @@ static TextureInfo LoadTexture_Assimp(
 
     std::string texPath = str.C_Str();
 
+    // ✅ WRAP режимы из материала (glTF sampler)
+    aiTextureMapMode mapU = aiTextureMapMode_Wrap;
+    aiTextureMapMode mapV = aiTextureMapMode_Wrap;
+
+    // Иногда ассет/импортёр не заполняет — тогда останется Wrap
+    material->Get(AI_MATKEY_MAPPINGMODE_U(type, index), mapU);
+    material->Get(AI_MATKEY_MAPPINGMODE_V(type, index), mapV);
+
+    auto ToGLWrap = [](aiTextureMapMode m) {
+        switch (m) {
+        case aiTextureMapMode_Clamp:  return (GLint)GL_CLAMP_TO_EDGE;
+        case aiTextureMapMode_Mirror: return (GLint)GL_MIRRORED_REPEAT;
+        case aiTextureMapMode_Wrap:
+        default:                      return (GLint)GL_REPEAT;
+        }
+        };
+
     // кэш по (path,typeName)
     for (const auto& t : loaded) {
         if (t.path == texPath && t.type == typeName)
@@ -118,8 +136,8 @@ static TextureInfo LoadTexture_Assimp(
             glGenTextures(1, &id);
             glBindTexture(GL_TEXTURE_2D, id);
 
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, ToGLWrap(mapU));
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, ToGLWrap(mapV));
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
