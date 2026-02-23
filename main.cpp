@@ -212,7 +212,6 @@ Camera g_cam(glm::vec3(0.0f, 10.0f, 20.0f));
 //
 
 // ===== TERRAIN =====
-#include "env_globals.h"
 #include "water.h"
 #include "sky.h"
 

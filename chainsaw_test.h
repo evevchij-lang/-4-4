@@ -680,18 +680,28 @@ void DrawCutAnim(const glm::mat4& proj, const glm::mat4& view)
     glDisable(GL_CULL_FACE);
 
     glUseProgram(g_cutShader);
+
     glUniformMatrix4fv(glGetUniformLocation(g_cutShader, "uProjection"), 1, GL_FALSE, &proj[0][0]);
     glUniformMatrix4fv(glGetUniformLocation(g_cutShader, "uView"), 1, GL_FALSE, &view[0][0]);
 
-    glUniform3f(glGetUniformLocation(g_cutShader, "uCamPos"), g_cam.pos.x, g_cam.pos.y, g_cam.pos.z);
-    glm::vec3 g_lightDir = glm::normalize(glm::vec3(0.4f, 1.0f, 0.2f));
-    glUniform3f(glGetUniformLocation(g_cutShader, "uLightDir"), g_lightDir.x, g_lightDir.y, g_lightDir.z);
+    // камера
+    glUniform3fv(glGetUniformLocation(g_cutShader, "uCamPos"), 1, &g_cam.pos[0]);
 
+    // свет (так же, как у террейна/деревьев)
+    glm::vec3 lightDir = glm::normalize(glm::vec3(0.4f, 1.0f, 0.2f));
+    glUniform3fv(glGetUniformLocation(g_cutShader, "uLightDir"), 1, &lightDir[0]);
 
+    // туман + подводность (имена как в main.cpp)
+    glUniform1i(glGetUniformLocation(g_cutShader, "uUnderwater"), underwater ? 1 : 0);
 
-    glUniform3f(glGetUniformLocation(g_cutShader, "uFogColor"), g_fogColor.x, g_fogColor.y, g_fogColor.z);
-    glUniform1f(glGetUniformLocation(g_cutShader, "uFogDensity"), g_fogDensity);
-    glUniform1i(glGetUniformLocation(g_cutShader, "uUnderwater"), g_underwater ? 1 : 0);
+    if (underwater) {
+        glUniform3fv(glGetUniformLocation(g_cutShader, "uFogColor"), 1, &fogColorUnder[0]);
+        glUniform1f(glGetUniformLocation(g_cutShader, "uFogDensity"), fogDensityUnder);
+    }
+    else {
+        glUniform3fv(glGetUniformLocation(g_cutShader, "uFogColor"), 1, &fogColorTop[0]);
+        glUniform1f(glGetUniformLocation(g_cutShader, "uFogDensity"), fogDensityTop);
+    }
     // дальше уже:
     //g_treeCutAnimModel.DrawWithAnimation(g_cutShader, world);
 
