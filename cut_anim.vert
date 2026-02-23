@@ -11,6 +11,6 @@ out vec2 vUV;
 
 void main()
 {
-    vUV = -aUV;
+    vUV = vec2(aUV.x, 1.0 - aUV.y);
     gl_Position = uProjection * uView * uModel * vec4(aPos, 1.0);
 }

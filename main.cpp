@@ -1,5 +1,6 @@
 ﻿// main.cpp
-
+// ЮВИ РАЗВЕРТКА!!!!!!!!!!!!!!!!!!!!!!!!!
+//vUV = vec2(aUV.x, 1.0 - aUV.y);
 
 #include <windows.h>
 #include "glad/glad.h"        
@@ -1808,11 +1809,15 @@ void DrawTreeObjects(const glm::mat4& proj, const glm::mat4& view)
 
 void ResolveTreeCollisions(glm::vec3& pos)
 {
-    int i = 0;
+    int i = -1;
     for (const auto& inst : g_treeInstances)
-    {        
-        if (i < g_treeRemoved.size() && g_treeRemoved[i]) continue;
+    {   
         i++;
+        if (i < g_treeRemoved.size() && g_treeRemoved[i])
+        {            
+            continue;
+        }
+        
         glm::vec2 p(pos.x, pos.z);
         glm::vec2 c(inst.pos.x, inst.pos.z);
         glm::vec2 d = p - c;
@@ -1834,12 +1839,16 @@ bool IsTreeBlockingDig(const glm::vec3& center, float holeRadius)
 {
     const float extra = 0.5f; // небольшой запас
     float r = holeRadius + extra;
-    int i = 0;
+    int i = -1;
 
     for (const auto& t : g_treeInstances)
     {
-        if (i < g_treeRemoved.size() && g_treeRemoved[i]) continue;
         i++;
+        if (i < g_treeRemoved.size() && g_treeRemoved[i]) {
+
+            continue;
+        }
+        
         float dx = t.pos.x - center.x;
         float dz = t.pos.z - center.z;
         float dist2 = dx * dx + dz * dz;
@@ -2022,7 +2031,10 @@ void RebuildTreeInstanceBuffer()
 
     for (size_t i = 0; i < g_treeInstances.size(); ++i)
     {
-        if (i < g_treeRemoved.size() && g_treeRemoved[i]) continue;
+        if (i < g_treeRemoved.size() && g_treeRemoved[i]) {
+
+            continue;
+        }
 
         const auto& t = g_treeInstances[i];
 

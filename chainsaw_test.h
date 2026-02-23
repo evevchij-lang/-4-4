@@ -684,11 +684,11 @@ void DrawCutAnim(const glm::mat4& proj, const glm::mat4& view)
     glUniformMatrix4fv(glGetUniformLocation(g_cutShader, "uView"), 1, GL_FALSE, &view[0][0]);
 
     glm::mat4 M(1.0f);
-    M = glm::translate(M, g_cutAnim.pos);
-    M = glm::rotate(M, g_cutAnim.rot.y, glm::vec3(0, 1, 0));
+    M = glm::translate(M, glm::vec3(g_cutAnim.pos.x, g_cutAnim.pos.y + 0.5, g_cutAnim.pos.z) );
+    M = glm::rotate(M, (float) - 1.1, glm::vec3(0, 1, 0));
     M = glm::rotate(M, g_cutAnim.rot.x, glm::vec3(1, 0, 0));
     M = glm::rotate(M, g_cutAnim.rot.z, glm::vec3(0, 0, 1));
-    M = glm::scale(M, glm::vec3(0.3));
+    M = glm::scale(M, glm::vec3(0.2));
 
     g_treeCutAnimModel.DrawWithAnimation(g_cutShader, M);
 
