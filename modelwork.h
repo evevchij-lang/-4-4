@@ -58,6 +58,10 @@ struct TextureInfo {
     GLuint id = 0;
     std::string type;   // "texture_diffuse", ...
     std::string path;   // для предотвращения повторной загрузки
+    glm::vec2 uvOffset{ 0.0f, 0.0f };
+    glm::vec2 uvScale{ 1.0f, 1.0f };
+    float uvRotation = 0.0f;
+    bool hasUvTransform = false;
 };
 
 static TextureInfo LoadTextureFromFile(const std::string& filename,
@@ -97,6 +101,13 @@ static TextureInfo LoadTexture_Assimp(
 
     std::string texPath = str.C_Str();
 
+    bool isEmbedded = (!texPath.empty() && texPath[0] == '*');
+
+
+    // ===== UV transform (glTF KHR_texture_transform) if present =====
+    aiUVTransform uvtr;
+    bool hasUvTransform = (material->Get(AI_MATKEY_UVTRANSFORM(type, index), uvtr) == AI_SUCCESS);
+
     // ✅ WRAP режимы из материала (glTF sampler)
     aiTextureMapMode mapU = aiTextureMapMode_Wrap;
     aiTextureMapMode mapV = aiTextureMapMode_Wrap;
@@ -123,6 +134,15 @@ static TextureInfo LoadTexture_Assimp(
     TextureInfo tex{};
     tex.type = typeName;
     tex.path = texPath;
+
+    // ✅ НЕ кэшируем embedded и НЕ кэшируем текстуры с UV-transform
+    if (!isEmbedded && !hasUvTransform)
+    {
+        for (const auto& t : loaded) {
+            if (t.path == texPath && t.type == typeName)
+                return t;
+        }
+    }
 
     // Embedded texture "*0"
     if (!texPath.empty() && texPath[0] == '*')
@@ -203,8 +223,8 @@ static TextureInfo LoadTexture_Assimp(
                 GL_RGBA, GL_UNSIGNED_BYTE, data);
             glGenerateMipmap(GL_TEXTURE_2D);
 
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, ToGLWrap(mapU));
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, ToGLWrap(mapV));
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
@@ -217,6 +237,7 @@ static TextureInfo LoadTexture_Assimp(
 
     if (tex.id != 0)
         loaded.push_back(tex);
+
 
     return tex;
 }
@@ -236,23 +257,47 @@ struct Mesh {
 
     void Draw(GLuint shader) const
     {
-        if (!textures.empty()) {
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, textures[0].id);
-            if (name == "Mesh0")
+        const TextureInfo* diff = nullptr;
+
+        for (const auto& t : textures)
+        {
+            if (t.type == "texture_diffuse" && t.id != 0)
             {
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+                diff = &t;
+                break;
             }
-            GLint loc = glGetUniformLocation(shader, "uTex");
-            if (loc >= 0) glUniform1i(loc, 0);
         }
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, diff ? diff->id : 0);
+
+        GLint locTex = glGetUniformLocation(shader, "uTex");
+        if (locTex >= 0) glUniform1i(locTex, 0);
+
+        // ===== UV TRANSFORM =====
+        glm::vec2 off(0.0f, 0.0f);
+        glm::vec2 scl(1.0f, 1.0f);
+        float rot = 0.0f;
+
+        if (diff && diff->hasUvTransform)
+        {
+            off = diff->uvOffset;
+            scl = diff->uvScale;
+            rot = diff->uvRotation;
+        }
+
+        GLint locOff = glGetUniformLocation(shader, "uUvOffset");
+        if (locOff >= 0) glUniform2f(locOff, off.x, off.y);
+
+        GLint locScl = glGetUniformLocation(shader, "uUvScale");
+        if (locScl >= 0) glUniform2f(locScl, scl.x, scl.y);
+
+        GLint locRot = glGetUniformLocation(shader, "uUvRotation");
+        if (locRot >= 0) glUniform1f(locRot, rot);
 
         glBindVertexArray(vao);
         glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, 0);
         glBindVertexArray(0);
-
-        glActiveTexture(GL_TEXTURE0);
     }
 
     void DrawInstanced(GLuint shader, GLsizei instanceCount) const
@@ -475,15 +520,15 @@ inline bool Model::Load(const std::string& path)
                     float u = (float)uv.x;
                     float vv = (float)uv.y;
 
-                    // ✅ ONLY for saw: normalize UV into 0..1
-                    if (isSaw && mesh->HasTextureCoords(0))
-                    {
-                        float offU = -std::floor(minU);
-                        float offV = -std::floor(minV);
+                    //// ✅ ONLY for saw: normalize UV into 0..1
+                    //if (isSaw && mesh->HasTextureCoords(0))
+                    //{
+                    //    float offU = -std::floor(minU);
+                    //    float offV = -std::floor(minV);
 
-                        u += offU;
-                        vv += offV;
-                    }
+                    //    u += offU;
+                    //    vv += offV;
+                    //}
 
                     // POSITION (3)
                     vertices.push_back(pos.x);
