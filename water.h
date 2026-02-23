@@ -11,14 +11,14 @@ std::vector<uint8_t> waterMask; // 0 = сухо, 1 = вода
 int waterW, waterH;             // как hmW, hmH
 GLuint g_waterMaskTex = 0;
 
-
+#include "env_globals.h"
 
 
 //для подводы 
-glm::vec3 fogColorTop = glm::vec3(0.6f, 0.7f, 0.9f);
-glm::vec3 fogColorUnder = glm::vec3(0.04f, 0.18f, 0.22f);
-float fogDensityTop = 0.001f;
-float fogDensityUnder = 0.8f;
+fogColorTop = glm::vec3(0.6f, 0.7f, 0.9f);
+fogColorUnder = glm::vec3(0.04f, 0.18f, 0.22f);
+fogDensityTop = 0.001f;
+fogDensityUnder = 0.8f;
 
 void InitWater()
 {

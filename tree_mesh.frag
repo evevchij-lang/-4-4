@@ -3,31 +3,30 @@
 in vec3 vNormal;
 in vec3 vWorldPos;
 in vec2 vTex;
+uniform vec3 uCamPos;
+uniform float uMaxDist; // радиус видимости деревьев
 
 out vec4 FragColor;
 
 uniform sampler2D uTex;
-
-uniform vec3 uCamPos;
 uniform vec3 uLightDir;
 
-// туман (как в tree_mesh.frag)
+// туман
 uniform int  uUnderwater;
 uniform vec3 uFogColor;
 uniform float uFogDensity;
 
 void main()
 {
-    // ВАЖНО: тот самый фикс, который ты вчера нашёл
     vec2 uv = vec2(vTex.x, 1.0 - vTex.y);
-
     vec4 tex = texture(uTex, uv);
 
-    // как у деревьев: вырезаем прозрачное
     if (tex.a < 0.2)
         discard;
-
+		
     float dist = length(uCamPos - vWorldPos);
+    if (dist > uMaxDist)
+        discard;
 
     vec3 N = normalize(vNormal);
     vec3 L = normalize(uLightDir);

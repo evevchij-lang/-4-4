@@ -683,6 +683,18 @@ void DrawCutAnim(const glm::mat4& proj, const glm::mat4& view)
     glUniformMatrix4fv(glGetUniformLocation(g_cutShader, "uProjection"), 1, GL_FALSE, &proj[0][0]);
     glUniformMatrix4fv(glGetUniformLocation(g_cutShader, "uView"), 1, GL_FALSE, &view[0][0]);
 
+    glUniform3f(glGetUniformLocation(g_cutShader, "uCamPos"), g_cam.pos.x, g_cam.pos.y, g_cam.pos.z);
+    glm::vec3 g_lightDir = glm::normalize(glm::vec3(0.4f, 1.0f, 0.2f));
+    glUniform3f(glGetUniformLocation(g_cutShader, "uLightDir"), g_lightDir.x, g_lightDir.y, g_lightDir.z);
+
+
+
+    glUniform3f(glGetUniformLocation(g_cutShader, "uFogColor"), g_fogColor.x, g_fogColor.y, g_fogColor.z);
+    glUniform1f(glGetUniformLocation(g_cutShader, "uFogDensity"), g_fogDensity);
+    glUniform1i(glGetUniformLocation(g_cutShader, "uUnderwater"), g_underwater ? 1 : 0);
+    // дальше уже:
+    //g_treeCutAnimModel.DrawWithAnimation(g_cutShader, world);
+
     glm::mat4 M(1.0f);
     M = glm::translate(M, glm::vec3(g_cutAnim.pos.x, g_cutAnim.pos.y + 0.5, g_cutAnim.pos.z) );
     M = glm::rotate(M, (float) - 1.1, glm::vec3(0, 1, 0));
