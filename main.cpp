@@ -781,7 +781,9 @@ Terrain g_terrain;
 #include "grass.h"
 #include "rake.h"
 #include "shovel.h"
-#include "chainsaw_test.h"
+//#include "chainsaw_test.h"
+#include "chainsaw_work.h"
+#include "cut_anim_work.h"
 
 void RemoveGrassInRadius(const glm::vec3& center, float radius);
 bool IsTreeBlockingDig(const glm::vec3& center, float holeRadius);
@@ -1250,7 +1252,8 @@ void Render()
     DrawRakeViewModel(proj, view);
     DrawShovelViewModel(proj, view);
     if (!g_cutAnim.active)
-     DrawChainsawTestViewModel(proj, view);
+        DrawChainsawWorkViewModel(proj, view);
+     //DrawChainsawTestViewModel(proj, view);
 
 
     SwapBuffers(g_hDC);
@@ -1374,8 +1377,9 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int)
     InitGrass();
     InitTreeObjects();
     InitRake();
+    InitCutAnim();
     InitShovel();
-    InitChainsawTest();
+    InitChainsawWork();
     InitWater();
 
     if (!g_treeCutAnimLoaded)
@@ -1404,7 +1408,8 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int)
         g_prevTime = now;
 
         UpdateCamera((float)dt);
-        UpdateChainsawTest((float)dt);
+        //UpdateChainsawTest((float)dt);
+        UpdateChainsawWork((float)dt);
 
         Render();
         g_time += dt;
@@ -2089,7 +2094,7 @@ void TryStartCut()
     SnapPlayerToTreeFront(idx);
 
     // 4) запуск “анимации распила”
-    g_targetTreeIndex = idx;
+    //g_targetTreeIndex = idx;
     g_cuttingTree = true;
-    g_cutTime = 0.0f;
+    //g_cutTime = 0.0f;
 }
