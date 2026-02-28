@@ -5,10 +5,13 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <fstream>
+#include <iomanip>
+
 #include "modelwork.h"
 
 // ==== ЭТО УЖЕ ОПРЕДЕЛЕНО В main.cpp ====
-// struct CutAnimInstance { ... };
+// struct CutAnimInstance { bool active; glm::vec3 pos; glm::vec3 rot; float scale; float t; float duration; ... };
 // CutAnimInstance g_cutAnim;
 // Model g_treeCutAnimModel;
 // bool g_treeCutAnimLoaded;
@@ -16,7 +19,7 @@
 // bool g_cuttingTree;
 // bool g_lockPlayerDuringCut;
 
-struct CutAnimInstance; // forward declaration (тип определён в main.cpp)
+struct CutAnimInstance; // тип определён в main.cpp
 
 // ресурсы/состояния из main.cpp
 extern CutAnimInstance g_cutAnim;
@@ -30,13 +33,54 @@ extern bool   g_lockPlayerDuringCut;
 // путь к glb катсцены распила
 static const char* g_cutAnimPath = "test_cut.glb";
 
+// ------------------------------
+// Debug/edit options (как у пилы)
+// ------------------------------
+static bool g_cutAnimEditMode = true;              // В РЕЛИЗЕ false
+//static bool debugAnim = false;                     // твой флаг: если true — лупаем анимацию
+static const char* g_cutAnimCfgFile = "cut_anim.cfg";
+
+// ---- сохранить текущие параметры распила ----
+inline void SaveCutAnimCfg()
+{
+    std::ofstream out(g_cutAnimCfgFile);
+    if (!out.is_open()) return;
+
+    out << std::fixed << std::setprecision(6);
+
+    // pos
+    out << g_cutAnim.pos.x << " " << g_cutAnim.pos.y << " " << g_cutAnim.pos.z << "\n";
+    // rot (radians)
+    out << g_cutAnim.rot.x << " " << g_cutAnim.rot.y << " " << g_cutAnim.rot.z << "\n";
+    // scale + duration
+    out << g_cutAnim.scale << "\n";
+    out << g_cutAnim.duration << "\n";
+
+    out.close();
+}
+
+// ---- загрузить параметры распила если файл существует ----
+inline void LoadCutAnimCfg()
+{
+    std::ifstream in(g_cutAnimCfgFile);
+    if (!in.is_open()) return; // файла нет -> дефолты из main.cpp
+
+    in >> g_cutAnim.pos.x >> g_cutAnim.pos.y >> g_cutAnim.pos.z;
+    in >> g_cutAnim.rot.x >> g_cutAnim.rot.y >> g_cutAnim.rot.z;
+    in >> g_cutAnim.scale;
+    in >> g_cutAnim.duration;
+
+    in.close();
+}
+
 // ---- матрица мира для катсцены (использует поля из g_cutAnim) ----
 inline glm::mat4 BuildCutWorldMatrix()
 {
     glm::mat4 M(1.0f);
+
     M = glm::translate(M, g_cutAnim.pos);
 
-    // rot хранится в радианах (у тебя так в main.cpp подписано)
+    // rot хранится в радианах
     M = glm::rotate(M, g_cutAnim.rot.y, glm::vec3(0, 1, 0));
     M = glm::rotate(M, g_cutAnim.rot.x, glm::vec3(1, 0, 0));
     M = glm::rotate(M, g_cutAnim.rot.z, glm::vec3(0, 0, 1));
@@ -55,6 +99,9 @@ inline void InitCutAnim()
         return;
     }
 
+    // Подхватим сохранённые параметры, если есть
+    LoadCutAnimCfg();
+
     g_treeCutAnimModel.ResetAnimation();
 
     g_cutAnim.active = false;
@@ -69,13 +116,11 @@ inline void StartCutAnimAt(const glm::vec3& p)
     if (!g_treeCutAnimLoaded) return;
 
     g_cutAnim.active = true;
+
+    // ВАЖНО: позицию ставим туда, где дерево
     g_cutAnim.pos = p;
+
     g_cutAnim.t = 0.0f;
-
-    // если в main.cpp duration уже выставлен — не трогаем
-    // иначе можно поставить дефолт:
-    // g_cutAnim.duration = 1.25f;
-
     g_cuttingTree = true;
 
     g_treeCutAnimModel.ResetAnimation();
@@ -91,6 +136,51 @@ inline void StopCutAnim()
 // ---- Update ----
 inline void UpdateCutAnim(float dt)
 {
+    // --- управление параметрами (только в edit mode) ---
+    // Старые клавиши, как ты просил:
+    // стрелки: x/z, PageUp/PageDown: y, NumPad1/3: rot.y, NumPad4/6: rot.x, NumPad7/9: rot.z, +/- scale
+    // NumPad5: сохранить
+    if (g_cutAnimEditMode)
+    {
+        const float step = 0.05f;
+        const float rotStep = glm::radians(2.0f);
+
+        // двигать "пивот" распила (в debug удобно)
+        if (GetAsyncKeyState(VK_LEFT) & 0x8000) g_cutAnim.pos.x -= step;
+        if (GetAsyncKeyState(VK_RIGHT) & 0x8000) g_cutAnim.pos.x += step;
+        if (GetAsyncKeyState(VK_UP) & 0x8000) g_cutAnim.pos.z -= step;
+        if (GetAsyncKeyState(VK_DOWN) & 0x8000) g_cutAnim.pos.z += step;
+
+        if (GetAsyncKeyState(VK_PRIOR) & 0x8000) g_cutAnim.pos.y += step; // PageUp
+        if (GetAsyncKeyState(VK_NEXT) & 0x8000) g_cutAnim.pos.y -= step; // PageDown
+
+        // вращение во всех плоскостях
+        if (GetAsyncKeyState(VK_NUMPAD1) & 0x8000) g_cutAnim.rot.y -= rotStep;
+        if (GetAsyncKeyState(VK_NUMPAD3) & 0x8000) g_cutAnim.rot.y += rotStep;
+
+        if (GetAsyncKeyState(VK_NUMPAD4) & 0x8000) g_cutAnim.rot.x -= rotStep;
+        if (GetAsyncKeyState(VK_NUMPAD6) & 0x8000) g_cutAnim.rot.x += rotStep;
+
+        if (GetAsyncKeyState(VK_NUMPAD7) & 0x8000) g_cutAnim.rot.z -= rotStep;
+        if (GetAsyncKeyState(VK_NUMPAD9) & 0x8000) g_cutAnim.rot.z += rotStep;
+
+        // масштаб
+        if (GetAsyncKeyState(VK_OEM_MINUS) & 0x8000)
+            g_cutAnim.scale = glm::max(0.01f, g_cutAnim.scale - 0.01f);
+
+        if (GetAsyncKeyState(VK_OEM_PLUS) & 0x8000)
+            g_cutAnim.scale += 0.01f;
+
+        // сохранить конфиг по NumPad5 (edge)
+        if (GetAsyncKeyState(VK_NUMPAD5) & 0x0001)
+            SaveCutAnimCfg();
+
+        // удобный toggle лупа на NumPad8 (edge) — можно убрать если не надо
+        if (GetAsyncKeyState(VK_NUMPAD8) & 0x0001)
+            debugAnim = !debugAnim;
+    }
+
+    // --- обычный апдейт анимации ---
     if (!g_cutAnim.active) return;
     if (!g_treeCutAnimLoaded) return;
 
@@ -98,9 +188,19 @@ inline void UpdateCutAnim(float dt)
 
     g_treeCutAnimModel.UpdateAnimation(dt);
 
-    // автостоп по времени, как у тебя задумано
+    // автостоп по длительности (или луп если debugAnim)
     if (g_cutAnim.duration > 0.0f && g_cutAnim.t >= g_cutAnim.duration)
-        StopCutAnim();
+    {
+        if (!debugAnim)
+        {
+            StopCutAnim();
+        }
+        else
+        {
+            g_cutAnim.t = 0.0f;
+            g_treeCutAnimModel.ResetAnimation();
+        }
+    }
 }
 
 // ---- Draw ----

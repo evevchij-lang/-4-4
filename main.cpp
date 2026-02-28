@@ -2,7 +2,7 @@
 // ЮВИ РАЗВЕРТКА!!!!!!!!!!!!!!!!!!!!!!!!!
 //vUV = vec2(aUV.x, 1.0 - aUV.y);
 
-#include <windows.h>
+#include <windows.h>g_cuttingTree 
 #include "glad/glad.h"        
 
 #include <glm/glm.hpp>
@@ -23,6 +23,7 @@
 #include <utility> // std::pair (обычно и так тянется, но пусть будет)
 //отладка
 float g_rakeSpinAngle = 0;
+bool debugAnim = false;
 
 // Параметры игрока (глобальные)
 float g_eyeHeight = 1.7f;    // высота глаз над землёй
@@ -53,6 +54,8 @@ std::vector<bool> g_treeRemoved;
 // ==== cut animation debug/spawn ====
 Model g_treeCutAnimModel;
 bool  g_treeCutAnimLoaded = false;
+bool g_cuttingTree = false;
+bool g_lockPlayerDuringCut = true;
 
 struct CutAnimInstance
 {
@@ -895,11 +898,11 @@ void TryStartCut();
 void UpdateCamera(float dt)
 {
 
-    //if (GetAsyncKeyState(VK_ESCAPE) & 0x0001)
-    //{
-    //    g_running = false;  // или как у тебя называется флаг цикла
-    //    return;
-    //}
+    if (GetAsyncKeyState(VK_ESCAPE) & 0x0001)
+    {
+        g_running = false;  // или как у тебя называется флаг цикла
+        return;
+    }
     
     ProcessMouse();
 
@@ -969,6 +972,7 @@ void UpdateCamera(float dt)
         glm::vec3 p = g_cam.pos + g_cam.front * 2.0f;
         p.y = g_terrain.getHeight(p.x, p.z); // на землю
         StartCutAnimAt(p);
+        debugAnim = true;
     }
 
 
