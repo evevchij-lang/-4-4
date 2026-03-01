@@ -23,6 +23,12 @@ struct CutAnimInstance; // тип определён в main.cpp
 
 // ресурсы/состояния из main.cpp
 extern CutAnimInstance g_cutAnim;
+
+glm::vec3 g_cutCamOffset(0.0f, 1.2f, 2.5f); // будет сохраняться на Num5
+float g_cutCamYaw = 0.0f;                  // опционально
+float g_cutCamPitch = 0.0f;                // опционально
+bool g_useCutFixedCamera = true;
+
 extern Model  g_treeCutAnimModel;
 extern bool   g_treeCutAnimLoaded;
 extern GLuint g_cutShader;
@@ -48,13 +54,25 @@ inline void SaveCutAnimCfg()
 
     out << std::fixed << std::setprecision(6);
 
-    // pos
-    out << g_cutAnim.pos.x << " " << g_cutAnim.pos.y << " " << g_cutAnim.pos.z << "\n";
-    // rot (radians)
-    out << g_cutAnim.rot.x << " " << g_cutAnim.rot.y << " " << g_cutAnim.rot.z << "\n";
-    // scale + duration
+    // 1) сохраняем OFFSET камеры от дерева
+    out << g_cutCamOffset.x << " "
+        << g_cutCamOffset.y << " "
+        << g_cutCamOffset.z << "\n";
+
+    // 2) сохраняем поворот сцены распила
+    out << g_cutAnim.rot.x << " "
+        << g_cutAnim.rot.y << " "
+        << g_cutAnim.rot.z << "\n";
+
+    // 3) масштаб
     out << g_cutAnim.scale << "\n";
+
+    // 4) длительность
     out << g_cutAnim.duration << "\n";
+
+    // 5) сохраняем направление камеры
+    out << g_cutCamYaw << " "
+        << g_cutCamPitch << "\n";
 
     out.close();
 }
@@ -63,12 +81,27 @@ inline void SaveCutAnimCfg()
 inline void LoadCutAnimCfg()
 {
     std::ifstream in(g_cutAnimCfgFile);
-    if (!in.is_open()) return; // файла нет -> дефолты из main.cpp
+    if (!in.is_open()) return;
 
-    in >> g_cutAnim.pos.x >> g_cutAnim.pos.y >> g_cutAnim.pos.z;
-    in >> g_cutAnim.rot.x >> g_cutAnim.rot.y >> g_cutAnim.rot.z;
+    // 1) offset камеры
+    in >> g_cutCamOffset.x
+        >> g_cutCamOffset.y
+        >> g_cutCamOffset.z;
+
+    // 2) rot сцены
+    in >> g_cutAnim.rot.x
+        >> g_cutAnim.rot.y
+        >> g_cutAnim.rot.z;
+
+    // 3) scale
     in >> g_cutAnim.scale;
+
+    // 4) duration
     in >> g_cutAnim.duration;
+
+    // 5) yaw/pitch камеры
+    in >> g_cutCamYaw
+        >> g_cutCamPitch;
 
     in.close();
 }
@@ -111,19 +144,23 @@ inline void InitCutAnim()
 }
 
 // ---- Start ----
-inline void StartCutAnimAt(const glm::vec3& p)
+inline void StartCutAnimAt(const glm::vec3& treePos, bool applyCamera)
 {
-    if (!g_treeCutAnimLoaded) return;
-
-    g_cutAnim.active = true;
-
-    // ВАЖНО: позицию ставим туда, где дерево
-    g_cutAnim.pos = p;
-
+    g_cutAnim.pos = treePos;
     g_cutAnim.t = 0.0f;
+    g_cutAnim.active = true;
     g_cuttingTree = true;
 
     g_treeCutAnimModel.ResetAnimation();
+
+    //// Камеру применяем ТОЛЬКО если явно просили
+    //if (applyCamera && g_useCutFixedCamera && g_lockPlayerDuringCut)
+    //{
+    //    g_cam.pos = treePos + g_cutCamOffset;
+    //    g_cam.yaw = g_cutCamYaw;
+    //    g_cam.pitch = g_cutCamPitch;
+    //    g_cam.updateVectors();
+    //}
 }
 
 // ---- Stop ----
@@ -145,14 +182,19 @@ inline void UpdateCutAnim(float dt)
         const float step = 0.05f;
         const float rotStep = glm::radians(2.0f);
 
-        // двигать "пивот" распила (в debug удобно)
-        if (GetAsyncKeyState(VK_LEFT) & 0x8000) g_cutAnim.pos.x -= step;
-        if (GetAsyncKeyState(VK_RIGHT) & 0x8000) g_cutAnim.pos.x += step;
-        if (GetAsyncKeyState(VK_UP) & 0x8000) g_cutAnim.pos.z -= step;
-        if (GetAsyncKeyState(VK_DOWN) & 0x8000) g_cutAnim.pos.z += step;
+        if (g_cutAnim.active)
+        {
+            const float step = 0.1f;
 
-        if (GetAsyncKeyState(VK_PRIOR) & 0x8000) g_cutAnim.pos.y += step; // PageUp
-        if (GetAsyncKeyState(VK_NEXT) & 0x8000) g_cutAnim.pos.y -= step; // PageDown
+            if (GetAsyncKeyState(VK_LEFT) & 0x8000) g_cam.pos.x -= step;
+            if (GetAsyncKeyState(VK_RIGHT) & 0x8000) g_cam.pos.x += step;
+
+            if (GetAsyncKeyState(VK_UP) & 0x8000) g_cam.pos.z -= step;
+            if (GetAsyncKeyState(VK_DOWN) & 0x8000) g_cam.pos.z += step;
+
+            if (GetAsyncKeyState(VK_PRIOR) & 0x8000) g_cam.pos.y += step;
+            if (GetAsyncKeyState(VK_NEXT) & 0x8000) g_cam.pos.y -= step;
+        }
 
         // вращение во всех плоскостях
         if (GetAsyncKeyState(VK_NUMPAD1) & 0x8000) g_cutAnim.rot.y -= rotStep;
@@ -173,7 +215,21 @@ inline void UpdateCutAnim(float dt)
 
         // сохранить конфиг по NumPad5 (edge)
         if (GetAsyncKeyState(VK_NUMPAD5) & 0x0001)
+        {
+            // дерево/сцена в world
+            const glm::vec3 treePos = g_cutAnim.pos;
+
+            // сохраняем не world pos камеры, а offset от дерева
+            g_cutCamOffset = g_cam.pos - treePos;
+
+            // если хочешь сохранять взгляд
+            g_cutCamYaw = g_cam.yaw;
+            g_cutCamPitch = g_cam.pitch;
+
+            //SaveCutConfigToFile(); // твоя функция (или просто запиши в файл)
             SaveCutAnimCfg();
+        }
+            
 
         // удобный toggle лупа на NumPad8 (edge) — можно убрать если не надо
         if (GetAsyncKeyState(VK_NUMPAD8) & 0x0001)
@@ -231,4 +287,12 @@ inline void DrawCutAnim(const glm::mat4& proj, const glm::mat4& view)
     g_treeCutAnimModel.DrawWithAnimation(g_cutShader, world);
 
     glDisable(GL_CULL_FACE);
+}
+
+inline void ApplyCutCamera(const glm::vec3& treePos)
+{
+    g_cam.pos = treePos + g_cutCamOffset;
+    g_cam.yaw = g_cutCamYaw;
+    g_cam.pitch = g_cutCamPitch;
+    g_cam.updateVectors();
 }

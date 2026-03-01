@@ -971,7 +971,8 @@ void UpdateCamera(float dt)
     {
         glm::vec3 p = g_cam.pos + g_cam.front * 2.0f;
         p.y = g_terrain.getHeight(p.x, p.z); // на землю
-        StartCutAnimAt(p);
+        StartCutAnimAt(p,false);
+        ApplyCutCamera(p);
         debugAnim = true;
     }
 
@@ -1140,7 +1141,7 @@ bool IsCameraUnderwater()
     float h = g_terrain.heights[idx]; // текущая высота террейна в этой клетке
 
     bool hasWaterHere = (waterMask[idx] != 0);
-    return hasWaterHere && (g_cam.pos.y < g_waterHeight - 0.05f);
+    return hasWaterHere && (g_cam.pos.y <= g_waterHeight + 0.2f);
 }
 
 // ===== РЕНДЕР =====
@@ -1686,7 +1687,7 @@ bool LoadOBJ(const char* path, Mesh& outMesh)
 
 void InitTreeObjects()
 {
-    if (!g_treeModel.Load("spruce2\\untitled.obj")) { // или "tree.obj"
+    if (!g_treeModel.Load("tree_new\\untitled.obj")) { // или "tree.obj"
         OutputDebugStringA("Failed to load tree model\n");
         return;
     }
@@ -2069,23 +2070,15 @@ void TryStartCut()
 {
     if (g_cuttingTree) return;
 
-    // Игрок
     glm::vec3 p = g_cam.pos;
     p.y = 0.0f;
 
-    // 1) ищем дерево рядом (радиус подстрой)
     int idx = FindNearestTreeIndexXZ(p, 5.0f);
     if (idx < 0) return;
     if (g_treeRemoved[idx]) return;
-    g_treeRemoved[idx] = true;
-    RebuildTreeInstanceBuffer();
-
-    // 3) заспавнить анимацию на позиции дерева
-    StartCutAnimAt(g_treeInstances[idx].pos);
 
     const auto& t = g_treeInstances[idx];
 
-    // 2) доп.порог: чтобы не “пилило” дерево через полкарты
     float trunkR = (t.radius > 0.0f ? t.radius : 0.8f);
     float interact = trunkR + 1.3f;
 
@@ -2094,11 +2087,23 @@ void TryStartCut()
     if (dx * dx + dz * dz > interact * interact)
         return;
 
-    // 3) снеп
+    glm::vec3 treePos = t.pos;
+
+    // 1) СНАЧАЛА снеп игрока
     SnapPlayerToTreeFront(idx);
 
-    // 4) запуск “анимации распила”
-    //g_targetTreeIndex = idx;
+    // 2) ПОТОМ запускаем катсцену
+    StartCutAnimAt(treePos, false);     // важно: без камеры внутри!
     g_cuttingTree = true;
-    //g_cutTime = 0.0f;
+
+    // 3) И ПОСЛЕДНИМ — ставим камеру (чтобы её ничто не перетёрло)
+    ApplyCutCamera(treePos);
+
+    char b[256];
+    sprintf_s(b, "After ApplyCutCamera cam=(%.2f %.2f %.2f)\n", g_cam.pos.x, g_cam.pos.y, g_cam.pos.z);
+    OutputDebugStringA(b);
+
+    // 4) Уже потом убираем дерево
+    g_treeRemoved[idx] = true;
+    RebuildTreeInstanceBuffer();
 }
